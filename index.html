@@ -162,7 +162,7 @@ select option { background: var(--card); }
 <body>
 
 <div class="topbar">
-  <h1>Spendly </h1>
+  <h1>Spendly ₹</h1>
   <div class="topbar-right">
     <button class="export-btn" onclick="openExportModal()" title="Export data">↓ Export</button>
     <button class="month-pill" onclick="toggleMonthModal()" id="month-btn">May 2026 ▾</button>
@@ -603,7 +603,7 @@ function refreshAll() {
   const wantsDaily=daily.filter(x=>!NEEDS_CATS.includes(x.category)).reduce((a,x)=>a+x.amount,0);
   const totalNeeds=needsFixed+needsDaily;
   const totalWants=wantsFixed+wantsDaily;
-  const totalSavings=savingsFixed+Math.max(0,remaining);
+  const totalSavings=savingsFixed;
   const needsPct=income>0?Math.round((totalNeeds/income)*100):0;
   const wantsPct=income>0?Math.round((totalWants/income)*100):0;
   const savingsPct=income>0?Math.round((totalSavings/income)*100):0;
