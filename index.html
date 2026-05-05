@@ -209,7 +209,7 @@ select option { background: var(--card); }
     </div>
   </div>
 
-  <div class="card" id="income-card">
+  <div class="card" id="income-card" style="display:none">
     <div class="card-title">Monthly Income</div>
     <input type="number" id="income-input" placeholder="e.g. 80000" style="font-family:'DM Serif Display',serif;font-size:28px;border:none;background:transparent;padding:0;font-weight:400;color:var(--ink);margin-bottom:4px" oninput="saveIncome()">
     <div style="font-size:12px;color:var(--ink3)">Tap to edit your monthly income</div>
@@ -280,12 +280,19 @@ select option { background: var(--card); }
       </select>
     </div>
     <input type="text" id="q-note" placeholder="Note (optional)" style="margin-bottom:10px">
+    <input type="date" id="q-date" style="margin-bottom:10px">
     <button class="btn btn-primary" onclick="quickAdd()">+ Add Expense</button>
   </div>
 </div>
 
 <!-- ===== FIXED TAB ===== -->
 <div class="page" id="tab-fixed">
+  <div class="card">
+    <div class="card-title">Monthly Income</div>
+    <input type="number" id="income-input" placeholder="e.g. 80000" style="font-family:'DM Serif Display',serif;font-size:28px;border:none;background:transparent;padding:0;font-weight:400;color:var(--ink);margin-bottom:4px" oninput="saveIncome()">
+    <div style="font-size:12px;color:var(--ink3)">Your take-home monthly income</div>
+  </div>
+
   <div class="card">
     <div class="card-title">Fixed Monthly Costs</div>
     <div id="fixed-list"></div>
@@ -328,6 +335,7 @@ select option { background: var(--card); }
       </select>
     </div>
     <input type="text" id="d-note" placeholder="What was it for?" style="margin-bottom:10px">
+    <input type="date" id="d-date" style="margin-bottom:10px">
     <button class="btn btn-secondary" onclick="addDaily()">Add Expense</button>
   </div>
 
@@ -349,6 +357,24 @@ select option { background: var(--card); }
   <div class="sec-hd">
     <span class="sec-title">All Expenses</span>
     <span style="font-size:13px;color:var(--ink3)" id="tracker-total">Total: ₹0</span>
+  </div>
+
+  <!-- DATE FILTER -->
+  <div class="card" style="padding:12px 14px;margin-bottom:10px">
+    <div style="font-size:11px;font-weight:600;color:var(--ink3);text-transform:uppercase;letter-spacing:1px;margin-bottom:10px">Date Range</div>
+    <div style="display:flex;gap:6px;overflow-x:auto;margin-bottom:10px;padding-bottom:2px" id="date-preset-bar">
+      <div class="filter-chip active" onclick="setDatePreset('month',this)">This Month</div>
+      <div class="filter-chip" onclick="setDatePreset('today',this)">Today</div>
+      <div class="filter-chip" onclick="setDatePreset('week',this)">This Week</div>
+      <div class="filter-chip" onclick="setDatePreset('last7',this)">Last 7 Days</div>
+      <div class="filter-chip" onclick="setDatePreset('last30',this)">Last 30 Days</div>
+      <div class="filter-chip" onclick="setDatePreset('custom',this)">Custom</div>
+    </div>
+    <div id="custom-date-wrap" style="display:none;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:8px">
+      <div><label>From</label><input type="date" id="filter-from" onchange="applyCustomDate()"></div>
+      <div><label>To</label><input type="date" id="filter-to" onchange="applyCustomDate()"></div>
+    </div>
+    <div style="font-size:12px;color:var(--accent2)" id="date-range-label">Showing: This Month</div>
   </div>
 
   <div class="table-filter-bar" id="tracker-filters">
@@ -460,6 +486,28 @@ select option { background: var(--card); }
       </select>
     </div>
     <button class="btn btn-primary" onclick="addFixed()">Add Fixed Cost</button>
+  </div>
+</div>
+
+<div class="modal-bg" id="edit-fixed-modal">
+  <div class="modal">
+    <button class="modal-close" onclick="closeModal('edit-fixed-modal')">✕</button>
+    <h3>Edit Fixed Cost</h3>
+    <input type="hidden" id="efc-id">
+    <div class="field">
+      <label>Name</label>
+      <input type="text" id="efc-name">
+    </div>
+    <div class="field"><label>Amount (₹)</label><input type="number" id="efc-amount"></div>
+    <div class="field">
+      <label>Type</label>
+      <select id="efc-type">
+        <option value="need">Need (essential)</option>
+        <option value="want">Want (lifestyle)</option>
+        <option value="savings">Savings/Investment</option>
+      </select>
+    </div>
+    <button class="btn btn-primary" onclick="saveEditFixed()">Save Changes</button>
   </div>
 </div>
 
@@ -708,6 +756,24 @@ function addFixed() {
   refreshAll(); toast(name+' added ✓');
 }
 function deleteFixed(id) { save('fixed',loadFixed().filter(x=>x.id!==id)); refreshAll(); }
+function openEditFixed(id) {
+  const item = loadFixed().find(x=>x.id===id);
+  if(!item) return;
+  el('efc-id').value = id;
+  el('efc-name').value = item.name;
+  el('efc-amount').value = item.amount;
+  el('efc-type').value = item.type;
+  el('edit-fixed-modal').classList.add('open');
+}
+function saveEditFixed() {
+  const id = parseInt(el('efc-id').value);
+  const name = el('efc-name').value.trim();
+  const amount = parseFloat(el('efc-amount').value);
+  const type = el('efc-type').value;
+  if(!name||!amount){toast('Fill all fields');return;}
+  const list = loadFixed().map(x => x.id===id ? {...x,name,amount,type} : x);
+  save('fixed',list); closeModal('edit-fixed-modal'); refreshAll(); toast(name+' updated ✓');
+}
 function renderFixed() {
   const list=loadFixed();
   const typeIcon={need:'🏠',want:'✨',savings:'💰'};
@@ -720,8 +786,9 @@ function renderFixed() {
           <span class="row-name">${typeIcon[x.type]||'📌'} ${x.name}</span>
           <span><span class="tag ${typeColor[x.type]}">${x.type}</span></span>
         </div>
-        <div style="display:flex;align-items:center;gap:10px">
+        <div style="display:flex;align-items:center;gap:6px">
           <span class="row-amt">${fmt(x.amount)}</span>
+          <button class="exp-del" onclick="openEditFixed(${x.id})" style="color:var(--accent2)">✏️</button>
           <button class="exp-del" onclick="deleteFixed(${x.id})">✕</button>
         </div>
       </div>`).join('');
@@ -775,23 +842,29 @@ function quickAdd() {
   const amount=parseFloat(el('q-amount').value);
   const category=el('q-cat').value||'Misc';
   const note=el('q-note').value;
+  const date=el('q-date').value||new Date().toISOString().slice(0,10);
   if(!amount){toast('Enter an amount');return;}
-  addExpense(amount,category,note);
+  addExpense(amount,category,note,date);
   el('q-amount').value=''; el('q-note').value=''; el('q-cat').value='';
+  el('q-date').value=new Date().toISOString().slice(0,10);
 }
 function addDaily() {
   const amount=parseFloat(el('d-amount').value);
   const category=el('d-cat').value;
   const note=el('d-note').value;
+  const date=el('d-date').value||new Date().toISOString().slice(0,10);
   if(!amount){toast('Enter an amount');return;}
-  addExpense(amount,category,note);
+  addExpense(amount,category,note,date);
   el('d-amount').value=''; el('d-note').value='';
+  el('d-date').value=new Date().toISOString().slice(0,10);
 }
-function addExpense(amount,category,note) {
-  const list=loadDaily();
-  list.unshift({id:Date.now(),amount,category,note,date:new Date().toISOString()});
-  save('daily',list); refreshAll();
-  checkBudgetAlert(category,list);
+function addExpense(amount,category,note,dateVal) {
+  const d = dateVal || new Date().toISOString().slice(0,10);
+  const monthKey = d.slice(0,7);
+  const list = load('daily', monthKey) || [];
+  list.unshift({id:Date.now(),amount,category,note,date:d});
+  save('daily',list,monthKey); refreshAll();
+  checkBudgetAlert(category, loadDaily());
   toast(fmt(amount)+' in '+category+' ✓');
 }
 function checkBudgetAlert(category,list) {
@@ -845,6 +918,59 @@ function renderCatSummary() {
   }).filter(Boolean).join('') || '<div style="color:var(--ink3);font-size:13px;padding:8px 0">No expenses this month</div>';
 }
 
+// ===== DATE FILTER =====
+let dateFrom=null, dateTo=null, datePreset='month';
+function setDatePreset(preset, btn) {
+  datePreset=preset;
+  document.querySelectorAll('#date-preset-bar .filter-chip').forEach(c=>c.classList.remove('active'));
+  btn.classList.add('active');
+  const wrap=el('custom-date-wrap');
+  const today=new Date().toISOString().slice(0,10);
+  if(preset==='today') {
+    dateFrom=dateTo=today; wrap.style.display='none';
+    el('date-range-label').textContent='Showing: Today only';
+  } else if(preset==='week') {
+    const d=new Date(); const day=d.getDay();
+    const mon=new Date(d); mon.setDate(d.getDate()-(day===0?6:day-1));
+    dateFrom=mon.toISOString().slice(0,10); dateTo=today; wrap.style.display='none';
+    el('date-range-label').textContent='Showing: This week';
+  } else if(preset==='last7') {
+    const d=new Date(); d.setDate(d.getDate()-6);
+    dateFrom=d.toISOString().slice(0,10); dateTo=today; wrap.style.display='none';
+    el('date-range-label').textContent='Showing: Last 7 days';
+  } else if(preset==='last30') {
+    const d=new Date(); d.setDate(d.getDate()-29);
+    dateFrom=d.toISOString().slice(0,10); dateTo=today; wrap.style.display='none';
+    el('date-range-label').textContent='Showing: Last 30 days';
+  } else if(preset==='custom') {
+    wrap.style.display='grid';
+    el('filter-from').value=dateFrom||currentMonth+'-01';
+    el('filter-to').value=dateTo||today;
+    el('date-range-label').textContent='Pick dates below';
+    return;
+  } else {
+    dateFrom=dateTo=null; wrap.style.display='none';
+    el('date-range-label').textContent='Showing: '+formatMonth(currentMonth);
+  }
+  renderTrackerTable();
+}
+function applyCustomDate() {
+  dateFrom=el('filter-from').value; dateTo=el('filter-to').value;
+  if(dateFrom&&dateTo) { el('date-range-label').textContent=dateFrom+' → '+dateTo; renderTrackerTable(); }
+}
+function getTrackerExpenses() {
+  if(dateFrom&&dateTo&&datePreset!=='month') {
+    let all=[];
+    const months=new Set();
+    const start=new Date(dateFrom), end=new Date(dateTo);
+    const cur=new Date(start.getFullYear(),start.getMonth(),1);
+    while(cur<=end){months.add(cur.toISOString().slice(0,7));cur.setMonth(cur.getMonth()+1);}
+    months.forEach(m=>{all=all.concat(load('daily',m)||[]);});
+    return all.filter(x=>x.date>=dateFrom&&x.date<=dateTo);
+  }
+  return loadDaily();
+}
+
 // ===== TRACKER TABLE =====
 function setFilter(cat, el_) {
   activeFilter=cat;
@@ -853,8 +979,8 @@ function setFilter(cat, el_) {
   renderTrackerTable();
 }
 function renderTrackerTable() {
-  const daily=loadDaily();
-  const filtered=activeFilter==='All'?daily:daily.filter(x=>x.category===activeFilter);
+  const all = getTrackerExpenses();
+  const filtered=activeFilter==='All'?all:all.filter(x=>x.category===activeFilter);
   const total=filtered.reduce((a,x)=>a+x.amount,0);
   el('tracker-total').textContent='Total: '+fmt(total);
   if(filtered.length===0) {
@@ -1166,6 +1292,8 @@ document.addEventListener('click',function(e){
 
 // ===== INIT =====
 selectMonth(currentMonth);
+el('q-date').value = new Date().toISOString().slice(0,10);
+el('d-date').value = new Date().toISOString().slice(0,10);
 </script>
 </body>
 </html>
